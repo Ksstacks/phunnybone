@@ -8,14 +8,14 @@ from twilio.http.http_client import TwilioHttpClient
 # ============ CONFIGURATION ============
 
 CONFIG = {
-    'use_twilio': False,
+    'use_twilio': True,
     'use_numverify': True,
-    'use_abstract': False,
-    'use_veriphone': False,
+    'use_abstract': True,
+    'use_veriphone': True,
 
     'twilio_sid': 'your_twilio_sid',
     'twilio_token': 'your_twilio_token',
-    'twilio_proxy': 'socks5://username:password@proxy:port',  # or None
+    'twilio_proxy': 'socks5://username:password@proxyhost:port',  # e.g., 'socks5://user:pass@127.0.0.1:9050'
 
     'numverify_key': 'your_numverify_api_key',
     'abstract_key': 'your_abstractapi_key',
@@ -74,24 +74,33 @@ def veriphone_lookup(phone_number):
     except Exception as e:
         return f"Veriphone: Failed - {e}"
 
-# ============ MAIN EXECUTION ============
+# ============ USER INPUT AND NUMBER GENERATION ============
 
-def generate_phone_number(country_code, area_code):
-    number = random.randint(1000000, 9999999)
-    return f"{country_code}{area_code}{number}"
-
-def main():
+def get_user_input():
+    """Prompt user for phone number components."""
     country_code = input("Enter country code (e.g., +1): ").strip()
-    area_code = input("Enter area code (e.g., 212): ").strip()
-
     if not country_code.startswith('+'):
         country_code = '+' + country_code
 
+    area_code = input("Enter area code (first 3 digits, e.g., 212): ").strip()
+    exchange_code = input("Enter exchange code (next 3 digits, e.g., 555): ").strip()
+
+    return country_code, area_code, exchange_code
+
+def generate_phone_number(country_code, area_code, exchange_code):
+    """Generate a random phone number with fixed area and exchange code."""
+    last_four = random.randint(1000, 9999)
+    return f"{country_code}{area_code}{exchange_code}{last_four}"
+
+# ============ MAIN EXECUTION ============
+
+def main():
+    country_code, area_code, exchange_code = get_user_input()
     client = get_twilio_client() if CONFIG['use_twilio'] else None
 
     results = []
     for _ in range(10):
-        phone_number = generate_phone_number(country_code, area_code)
+        phone_number = generate_phone_number(country_code, area_code, exchange_code)
         result = [f"\n📞 Checking: {phone_number}"]
 
         # Local check
