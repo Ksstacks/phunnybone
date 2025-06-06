@@ -1,75 +1,124 @@
 import random
 import phonenumbers
+import requests
 from phonenumbers import geocoder, carrier, NumberParseException
 from twilio.rest import Client
 from twilio.http.http_client import TwilioHttpClient
 
+# ============ CONFIGURATION ============
+
+CONFIG = {
+    'use_twilio': False,
+    'use_numverify': True,
+    'use_abstract': False,
+    'use_veriphone': False,
+
+    'twilio_sid': 'your_twilio_sid',
+    'twilio_token': 'your_twilio_token',
+    'twilio_proxy': 'socks5://username:password@proxy:port',  # or None
+
+    'numverify_key': 'your_numverify_api_key',
+    'abstract_key': 'your_abstractapi_key',
+    'veriphone_key': 'your_veriphone_key',
+}
+
+# ============ SETUP ============
+
 def get_twilio_client():
-    """Set up the Twilio client with a SOCKS5 proxy."""
-    # Twilio credentials
-    account_sid = 'your_account_sid_here'
-    auth_token = 'your_auth_token_here'
-    
-    # SOCKS5 proxy configuration (requires PySocks: pip install pysocks)
     proxy_client = TwilioHttpClient()
-    proxy_client.session.proxies = {
-        'https': 'socks5://username:password@proxyserver:port'
-    }
+    if CONFIG['twilio_proxy']:
+        proxy_client.session.proxies = {'https': CONFIG['twilio_proxy']}
+    return Client(CONFIG['twilio_sid'], CONFIG['twilio_token'], http_client=proxy_client)
 
-    # Return Twilio client with proxy
-    return Client(account_sid, auth_token, http_client=proxy_client)
+# ============ LOOKUP FUNCTIONS ============
 
-def get_user_input():
-    """Prompt user for country code and area code."""
-    country_code = input("Enter the country code (e.g., +1, +44, +91): ")
-    area_code = input("Enter the area code (e.g., for USA 212, for UK 20): ")
+def local_lookup(phone_number):
+    try:
+        parsed = phonenumbers.parse(phone_number)
+        is_valid = phonenumbers.is_valid_number(parsed)
+        location = geocoder.description_for_number(parsed, "en")
+        carrier_name = carrier.name_for_number(parsed, "en") if is_valid else "Unknown"
+        return f"Local: {phone_number}, Valid: {is_valid}, Location: {location}, Carrier: {carrier_name}"
+    except NumberParseException:
+        return f"Local: {phone_number}, Invalid format"
 
-    # Ensure country code starts with '+'
-    if not country_code.startswith('+'):
-        country_code = '+' + country_code
+def twilio_lookup(client, phone_number):
+    try:
+        lookup = client.lookups.v1.phone_numbers(phone_number).fetch(type=['carrier'])
+        carrier_name = lookup.carrier['name'] if lookup.carrier else "Unknown"
+        return f"Twilio: Carrier: {carrier_name}"
+    except Exception as e:
+        return f"Twilio: Lookup failed - {e}"
 
-    return country_code, area_code
+def numverify_lookup(phone_number):
+    try:
+        url = f"http://apilayer.net/api/validate?access_key={CONFIG['numverify_key']}&number={phone_number}"
+        res = requests.get(url).json()
+        return f"NumVerify: Valid: {res.get('valid')}, Carrier: {res.get('carrier')}, Line type: {res.get('line_type')}"
+    except Exception as e:
+        return f"NumVerify: Failed - {e}"
+
+def abstract_lookup(phone_number):
+    try:
+        url = f"https://phonevalidation.abstractapi.com/v1/?api_key={CONFIG['abstract_key']}&phone={phone_number}"
+        res = requests.get(url).json()
+        return f"AbstractAPI: Valid: {res.get('valid')}, Carrier: {res.get('carrier')}, Type: {res.get('line_type')}"
+    except Exception as e:
+        return f"AbstractAPI: Failed - {e}"
+
+def veriphone_lookup(phone_number):
+    try:
+        url = f"https://api.veriphone.io/v2/verify?phone={phone_number}&key={CONFIG['veriphone_key']}"
+        res = requests.get(url).json()
+        return f"Veriphone: Valid: {res.get('phone_valid')}, Carrier: {res.get('carrier')}, Type: {res.get('phone_type')}"
+    except Exception as e:
+        return f"Veriphone: Failed - {e}"
+
+# ============ MAIN EXECUTION ============
 
 def generate_phone_number(country_code, area_code):
-    """Generate a random phone number for the given area code."""
     number = random.randint(1000000, 9999999)
     return f"{country_code}{area_code}{number}"
 
-def validate_phone_number(phone_number, client):
-    """Validate phone number using phonenumbers and Twilio Lookup API."""
-    try:
-        # Local validation
-        number = phonenumbers.parse(phone_number)
-        is_valid = phonenumbers.is_valid_number(number)
-        country = geocoder.description_for_number(number, "en")
-        local_carrier = carrier.name_for_number(number, "en") if is_valid else "Local carrier info not available"
-
-        # Remote Twilio lookup (v1 API)
-        twilio_lookup = client.lookups.v1.phone_numbers(phone_number).fetch(type=['carrier'])
-        twilio_carrier = twilio_lookup.carrier['name'] if twilio_lookup.carrier else "Twilio carrier info not available"
-
-        validation_result = "Valid" if is_valid else "Invalid"
-        return f"{phone_number}, {validation_result}, Country: {country}, Local Carrier: {local_carrier}, Twilio Carrier: {twilio_carrier}\n"
-
-    except NumberParseException:
-        return f"{phone_number}, Invalid, Error: Not in a valid format\n"
-    except Exception as e:
-        return f"{phone_number}, Twilio Lookup Failed, Error: {str(e)}\n"
-
 def main():
-    client = get_twilio_client()
-    country_code, area_code = get_user_input()
+    country_code = input("Enter country code (e.g., +1): ").strip()
+    area_code = input("Enter area code (e.g., 212): ").strip()
+
+    if not country_code.startswith('+'):
+        country_code = '+' + country_code
+
+    client = get_twilio_client() if CONFIG['use_twilio'] else None
+
     results = []
-
-    for _ in range(10):  # Generate 10 phone numbers
+    for _ in range(10):
         phone_number = generate_phone_number(country_code, area_code)
-        result = validate_phone_number(phone_number, client)
-        results.append(result)
-        print(result.strip())  # Optional: show output in terminal
+        result = [f"\n📞 Checking: {phone_number}"]
 
-    # Write results to file
-    with open('phone_numbers_validation_results.txt', 'w') as file:
-        file.writelines(results)
+        # Local check
+        result.append(local_lookup(phone_number))
+
+        # Twilio
+        if CONFIG['use_twilio'] and client:
+            result.append(twilio_lookup(client, phone_number))
+
+        # NumVerify
+        if CONFIG['use_numverify']:
+            result.append(numverify_lookup(phone_number))
+
+        # AbstractAPI
+        if CONFIG['use_abstract']:
+            result.append(abstract_lookup(phone_number))
+
+        # Veriphone
+        if CONFIG['use_veriphone']:
+            result.append(veriphone_lookup(phone_number))
+
+        final = '\n'.join(result)
+        print(final)
+        results.append(final + "\n")
+
+    with open('multi_api_phone_results.txt', 'w') as f:
+        f.writelines(results)
 
 if __name__ == "__main__":
     main()

@@ -1,2 +1,4 @@
-v1.phone_numbers
-twilio
+phonenumbers 
+twilio 
+requests 
+pysocks
