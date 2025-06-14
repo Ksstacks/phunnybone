@@ -3,6 +3,7 @@ import random
 import phonenumbers
 import requests
 from phonenumbers import geocoder, carrier, NumberParseException
+import time
 
 # ============ CONFIGURATION ============
 
@@ -30,14 +31,6 @@ def local_lookup(phone_number):
         return f"Local: {phone_number}, Valid: {is_valid}, Location: {location}, Carrier: {carrier_name}"
     except NumberParseException:
         return f"Local: {phone_number}, Invalid format"
-
-def twilio_lookup(client, phone_number):
-    try:
-        lookup = client.lookups.v1.phone_numbers(phone_number).fetch(type=['carrier'])
-        carrier_name = lookup.carrier['name'] if lookup.carrier else "Unknown"
-        return f"Twilio: Carrier: {carrier_name}"
-    except Exception as e:
-        return f"Twilio: Lookup failed - {e}"
 
 def numverify_lookup(phone_number, proxies=None):
     try:
@@ -84,34 +77,37 @@ def generate_phone_number(country_code, area_code, exchange_code, proxies=None):
 # ============ MAIN EXECUTION exchange_code============
 
 def main():
-    country_code, area_code, exchange_code = get_user_input()
+    try:
+        proxies = {"http": proxy, "https": proxy, "socks5": proxy} if proxy else None
+        country_code, area_code, exchange_code = get_user_input()
 
-    results = []
-    for _ in range(number_of_phone_num):
-        phone_number = generate_phone_number(country_code, area_code, exchange_code)
-        result = [f"\n📞 Checking: {phone_number}"]
+        results = []
+        for _ in range(number_of_phone_num):
+            phone_number = generate_phone_number(country_code, area_code, exchange_code)
+            result = [f"\n📞 Checking: {phone_number}"]
 
-        # Local check
-        result.append(local_lookup(phone_number))
+            # Local check
+            result.append(local_lookup(phone_number))
 
-        # NumVerify
-        if CONFIG['use_numverify']:
-            result.append(numverify_lookup(phone_number))
+            # NumVerify
+            if CONFIG['use_numverify']:
+                result.append(numverify_lookup(phone_number))
 
-        # AbstractAPI
-        if CONFIG['use_abstract']:
-            result.append(abstract_lookup(phone_number))
+            # AbstractAPI
+            if CONFIG['use_abstract']:
+                result.append(abstract_lookup(phone_number))
 
-        # Veriphone
-        if CONFIG['use_veriphone']:
-            result.append(veriphone_lookup(phone_number))
+            # Veriphone
+            if CONFIG['use_veriphone']:
+                result.append(veriphone_lookup(phone_number))
 
-        final = '\n'.join(result)
-        print(final)
-        results.append(final + "\n")
-    proxies = {"http": proxy, "https": proxy, "socks5": proxy} if proxy else None
-    with open('multi_api_phone_results.txt', 'w') as f:
-        f.write(results)
+            final = '\n'.join(result)
+            print(final)
+            results.append(final + "\n")
+    except KeyboardInterrupt:
+        print("Saving output...")
+        with open('multi_api_phone_results.txt', 'w') as f:
+            f.writelines(results)
 
 if __name__ == "__main__":
     main()
