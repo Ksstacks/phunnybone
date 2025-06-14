@@ -3,22 +3,19 @@ import random
 import phonenumbers
 import requests
 from phonenumbers import geocoder, carrier, NumberParseException
-from twilio.rest import Client
-from twilio.http.http_client import TwilioHttpClient
 
 # ============ CONFIGURATION ============
 
+number_of_phone_num = 9842000
+num_adjust_last_min = 1000000
+num_adjust_last_max = 9999999
+
 CONFIG = {
-    'use_twilio': True,
     'use_numverify': True,
-    'use_abstract': True,
-    'use_veriphone': True,
+    'use_abstract': False,
+    'use_veriphone': False,
 
-    'twilio_sid': 'your_twilio_sid',
-    'twilio_token': 'your_twilio_token',
-    'twilio_proxy': 'socks5://username:password@proxyhost:port',  # e.g., 'socks5://user:pass@127.0.0.1:9050'
-
-    'numverify_key': 'your_numverify_api_key',
+    'numverify_key': 'e618c7644af6e982ea5fdf523fed1c50',
     'abstract_key': 'your_abstractapi_key',
     'veriphone_key': 'your_veriphone_key',
 }
@@ -90,26 +87,21 @@ def get_user_input():
 
 def generate_phone_number(country_code, area_code, exchange_code):
     """Generate a random phone number with fixed area and exchange code."""
-    last_four = random.randint(1000, 9999)
+    last_four = random.randint(num_adjust_last_min, num_adjust_last_max)
     return f"{country_code}{area_code}{exchange_code}{last_four}"
 
-# ============ MAIN EXECUTION ============
+# ============ MAIN EXECUTION exchange_code============
 
 def main():
     country_code, area_code, exchange_code = get_user_input()
-    client = get_twilio_client() if CONFIG['use_twilio'] else None
 
     results = []
-    for _ in range(10):
+    for _ in range(number_of_phone_num):
         phone_number = generate_phone_number(country_code, area_code, exchange_code)
         result = [f"\n📞 Checking: {phone_number}"]
 
         # Local check
         result.append(local_lookup(phone_number))
-
-        # Twilio
-        if CONFIG['use_twilio'] and client:
-            result.append(twilio_lookup(client, phone_number))
 
         # NumVerify
         if CONFIG['use_numverify']:

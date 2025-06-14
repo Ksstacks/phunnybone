@@ -1,4 +1,3 @@
 phonenumbers 
-twilio 
 requests 
 pysocks
