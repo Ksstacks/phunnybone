@@ -7,13 +7,13 @@ import time
 
 # ============ CONFIGURATION ============
 
-number_of_phone_num = 950000
+number_of_phone_num = 9
 num_adjust_last_min = 1000000
 num_adjust_last_max = 9999999
 proxy = "socks5://127.0.0.1:9050"
 
 CONFIG = {
-    'use_numverify': True,
+    'use_numverify': False,
     'use_abstract': False,
     'use_veriphone': False,
 
@@ -106,7 +106,11 @@ def main():
             results.append(final + "\n")
     except KeyboardInterrupt:
         print("Saving output...")
-        with open('multi_api_phone_results.txt', 'w') as f:
+        with open('multi_api_phone_results2.txt', 'w') as f:
+            f.writelines(results)
+    finally:
+        print("Saving output...")
+        with open('multi_api_phone_results2.txt', 'w') as f:
             f.writelines(results)
 
 if __name__ == "__main__":
