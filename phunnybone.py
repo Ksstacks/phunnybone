@@ -6,9 +6,10 @@ from phonenumbers import geocoder, carrier, NumberParseException
 
 # ============ CONFIGURATION ============
 
-number_of_phone_num = 9842000
+number_of_phone_num = 950000
 num_adjust_last_min = 1000000
 num_adjust_last_max = 9999999
+proxy = "socks5://127.0.0.1:9050"
 
 CONFIG = {
     'use_numverify': True,
@@ -19,16 +20,6 @@ CONFIG = {
     'abstract_key': 'your_abstractapi_key',
     'veriphone_key': 'your_veriphone_key',
 }
-
-# ============ SETUP ============
-
-def get_twilio_client():
-    proxy_client = TwilioHttpClient()
-    if CONFIG['twilio_proxy']:
-        proxy_client.session.proxies = {'https': CONFIG['twilio_proxy']}
-    return Client(CONFIG['twilio_sid'], CONFIG['twilio_token'], http_client=proxy_client)
-
-# ============ LOOKUP FUNCTIONS ============
 
 def local_lookup(phone_number):
     try:
@@ -48,26 +39,26 @@ def twilio_lookup(client, phone_number):
     except Exception as e:
         return f"Twilio: Lookup failed - {e}"
 
-def numverify_lookup(phone_number):
+def numverify_lookup(phone_number, proxies=None):
     try:
         url = f"http://apilayer.net/api/validate?access_key={CONFIG['numverify_key']}&number={phone_number}"
-        res = requests.get(url).json()
+        res = requests.get(url, proxies=proxies).json()
         return f"NumVerify: Valid: {res.get('valid')}, Carrier: {res.get('carrier')}, Line type: {res.get('line_type')}"
     except Exception as e:
         return f"NumVerify: Failed - {e}"
 
-def abstract_lookup(phone_number):
+def abstract_lookup(phone_number, proxies=None):
     try:
         url = f"https://phonevalidation.abstractapi.com/v1/?api_key={CONFIG['abstract_key']}&phone={phone_number}"
-        res = requests.get(url).json()
+        res = requests.get(url, proxies=proxies).json()
         return f"AbstractAPI: Valid: {res.get('valid')}, Carrier: {res.get('carrier')}, Type: {res.get('line_type')}"
     except Exception as e:
         return f"AbstractAPI: Failed - {e}"
 
-def veriphone_lookup(phone_number):
+def veriphone_lookup(phone_number, proxies=None):
     try:
         url = f"https://api.veriphone.io/v2/verify?phone={phone_number}&key={CONFIG['veriphone_key']}"
-        res = requests.get(url).json()
+        res = requests.get(url, proxies=proxies).json()
         return f"Veriphone: Valid: {res.get('phone_valid')}, Carrier: {res.get('carrier')}, Type: {res.get('phone_type')}"
     except Exception as e:
         return f"Veriphone: Failed - {e}"
@@ -85,7 +76,7 @@ def get_user_input():
 
     return country_code, area_code, exchange_code
 
-def generate_phone_number(country_code, area_code, exchange_code):
+def generate_phone_number(country_code, area_code, exchange_code, proxies=None):
     """Generate a random phone number with fixed area and exchange code."""
     last_four = random.randint(num_adjust_last_min, num_adjust_last_max)
     return f"{country_code}{area_code}{exchange_code}{last_four}"
@@ -118,9 +109,9 @@ def main():
         final = '\n'.join(result)
         print(final)
         results.append(final + "\n")
-
+    proxies = {"http": proxy, "https": proxy, "socks5": proxy} if proxy else None
     with open('multi_api_phone_results.txt', 'w') as f:
-        f.writelines(results)
+        f.write(results)
 
 if __name__ == "__main__":
     main()
